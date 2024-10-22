@@ -74,7 +74,7 @@ const FlameIcon: React.FC<{ isHovering: boolean; isDropping: boolean }> = ({ isH
 );
 
 // Draggable Component
-const IdeaCard: React.FC<{ idea: Idea, onRemove: (id: string) => void }> = ({ idea, onRemove }) => {
+const IdeaCard: React.FC<{ idea: Idea }> = ({ idea }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ItemType.IDEA,
     item: { id: idea.id },
@@ -89,7 +89,7 @@ const IdeaCard: React.FC<{ idea: Idea, onRemove: (id: string) => void }> = ({ id
 
   return (
     <div
-      ref={elementRef}  // Assign the ref here
+      ref={elementRef}
       className={`bg-white/80 backdrop-blur-sm shadow-md rounded-xl p-4 mb-4 
       hover:shadow-lg transition-all duration-200 border border-gray-100 
       hover:bg-white/90 touch-manipulation ${isDragging ? 'opacity-50' : ''}`}
@@ -191,7 +191,7 @@ const BurnBookApp: React.FC = () => {
             <h2 className="text-2xl font-bold mb-4 text-center text-gray-800">Torn out Pages</h2>
             <div className="max-h-[40vh] overflow-y-auto mb-4 pr-2">
               {sealedIdeas.map((idea) => (
-                <IdeaCard key={idea.id} idea={idea} onRemove={handleDrop} />
+                <IdeaCard key={idea.id} idea={idea} />
               ))}
             </div>
           </div>
