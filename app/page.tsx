@@ -142,7 +142,6 @@ const BurnBookApp: React.FC = () => {
   const handleTouchMove = (e: React.TouchEvent) => {
     if (touchStartY && currentTouchedIdea) {
       const touchY = e.touches[0].clientY;
-      const deltaY = touchY - touchStartY;
       const burnZone = document.getElementById('burn-zone');
 
       if (burnZone) {
