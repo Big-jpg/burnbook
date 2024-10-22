@@ -3,8 +3,13 @@ import './globals.css'
 import 'react-toastify/dist/ReactToastify.css';
 import { Inter } from 'next/font/google'
 import { Metadata } from 'next'
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
+import { TouchBackend } from 'react-dnd-touch-backend';
+
 
 const inter = Inter({ subsets: ['latin'] })
+const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
 
 export const metadata: Metadata = {
   title: 'Burn Book - Let Your Thoughts Go',
@@ -82,16 +87,17 @@ export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
-}) {
+}) 
+{
   return (
     <html lang="en">
       <body className={`${inter.className} min-h-screen bg-gradient-to-br from-rose-50 via-white to-orange-50 flex flex-col`}>
-        <Header />
-        <main className="flex-grow">
-          {children}
-        </main>
-        <Footer />
+        <DndProvider backend={isMobile ? TouchBackend : HTML5Backend}>
+          <Header />
+          <main className="flex-grow">{children}</main>
+          <Footer />
+        </DndProvider>
       </body>
     </html>
-  )
+  );
 }
