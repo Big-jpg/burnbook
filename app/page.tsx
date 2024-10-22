@@ -5,6 +5,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { format } from 'date-fns';
+import { isMobile } from 'react-device-detect';
+
 
 interface Idea {
   id: string;
@@ -86,6 +88,22 @@ const BurnBookApp: React.FC = () => {
     }
   };
 
+  // Add this new component for mobile touch handling
+  const TouchHandler: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    useEffect(() => {
+      const preventDefault = (e: TouchEvent) => {
+        e.preventDefault();
+      };
+
+      document.addEventListener('touchmove', preventDefault, { passive: false });
+      return () => {
+        document.removeEventListener('touchmove', preventDefault);
+      };
+    }, []);
+
+    return <>{children}</>;
+  };
+
   const handleSeal = useCallback(() => {
     setIsSealed(true);
     setTimer(null);
@@ -120,39 +138,47 @@ const BurnBookApp: React.FC = () => {
     setCurrentTouchedIdea(idea);
   };
 
+  // Modify your handleTouchMove function:
   const handleTouchMove = (e: React.TouchEvent) => {
-    e.preventDefault();
     if (touchStartY && currentTouchedIdea) {
       const touchY = e.touches[0].clientY;
       const deltaY = touchY - touchStartY;
+      const burnZone = document.getElementById('burn-zone');
 
-      if (deltaY > 50) {
-        setIsHoveringBurn(true);
-      } else {
-        setIsHoveringBurn(false);
+      if (burnZone) {
+        const burnZoneRect = burnZone.getBoundingClientRect();
+        if (touchY > burnZoneRect.top) {
+          setIsHoveringBurn(true);
+        } else {
+          setIsHoveringBurn(false);
+        }
       }
     }
   };
 
+  // Modify your handleTouchEnd function:
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartY && currentTouchedIdea) {
       const touchY = e.changedTouches[0].clientY;
-      const deltaY = touchY - touchStartY;
+      const burnZone = document.getElementById('burn-zone');
 
-      if (deltaY > 50) {
-        setIsDropping(true);
-        setTimeout(() => {
-          setIsDropping(false);
-          setSealedIdeas((prev) => 
-            prev.filter((idea) => idea.id !== currentTouchedIdea.id)
-          );
-          toast.error("🔥 Page burned forever!", {
-            style: { background: '#ffeded' }
-          });
-        }, 1500);
+      if (burnZone) {
+        const burnZoneRect = burnZone.getBoundingClientRect();
+        if (touchY > burnZoneRect.top) {
+          setIsDropping(true);
+          setTimeout(() => {
+            setIsDropping(false);
+            setSealedIdeas((prev) =>
+              prev.filter((idea) => idea.id !== currentTouchedIdea.id)
+            );
+            toast.error("🔥 Page burned forever!", {
+              style: { background: '#ffeded' }
+            });
+          }, 1500);
+        }
       }
     }
-    
+
     setTouchStartY(null);
     setCurrentTouchedIdea(null);
     setIsHoveringBurn(false);
@@ -175,37 +201,53 @@ const BurnBookApp: React.FC = () => {
   };
 
   // Updated IdeaCard component with touch handlers
-  const IdeaCard: React.FC<{ idea: Idea }> = ({ idea }) => (
-    <div
-      draggable
-      onDragStart={() => handleDragStart(idea)}
-      onTouchStart={(e) => handleTouchStart(e, idea)}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className={`
-        bg-white/80 
-        backdrop-blur-sm 
-        shadow-md 
-        rounded-xl 
-        p-4 
-        mb-4 
-        cursor-move 
-        hover:shadow-lg 
-        transition-all 
-        duration-200 
-        border 
-        border-gray-100
-        hover:bg-white/90
-        touch-manipulation
-        ${currentTouchedIdea?.id === idea.id ? 'scale-105' : ''}
-      `}
-    >
-      <p className="text-gray-800">{idea.content}</p>
-      <p className="text-sm text-gray-500 mt-2">
-        {format(idea.createdAt, "MMM d, yyyy HH:mm")}
-      </p>
-    </div>
-  );
+  const IdeaCard: React.FC<{ idea: Idea }> = ({ idea }) => {
+    const [isDragging, setIsDragging] = useState(false);
+
+    return (
+      <div
+        draggable={!isMobile}
+        onDragStart={() => {
+          setIsDragging(true);
+          handleDragStart(idea);
+        }}
+        onDragEnd={() => setIsDragging(false)}
+        onTouchStart={(e) => handleTouchStart(e, idea)}
+        onTouchMove={(e) => {
+          e.stopPropagation();
+          handleTouchMove(e);
+        }}
+        onTouchEnd={(e) => {
+          e.stopPropagation();
+          handleTouchEnd(e);
+        }}
+        className={`
+          bg-white/80 
+          backdrop-blur-sm 
+          shadow-md 
+          rounded-xl 
+          p-4 
+          mb-4 
+          ${!isMobile ? 'cursor-move' : ''}
+          hover:shadow-lg 
+          transition-all 
+          duration-200 
+          border 
+          border-gray-100
+          hover:bg-white/90
+          touch-manipulation
+          ${isDragging ? 'opacity-50' : ''}
+          ${currentTouchedIdea?.id === idea.id ? 'scale-105' : ''}
+          active:scale-95
+        `}
+      >
+        <p className="text-gray-800">{idea.content}</p>
+        <p className="text-sm text-gray-500 mt-2">
+          {format(idea.createdAt, "MMM d, yyyy HH:mm")}
+        </p>
+      </div>
+    );
+  };
 
   // Mobile helper component
   const MobileHelper: React.FC = () => (
@@ -229,7 +271,9 @@ const BurnBookApp: React.FC = () => {
   }, [timer, handleSeal]);
 
   return (
-    <div className="container mx-auto py-8 px-4 flex flex-col items-center min-h-screen">
+    <TouchHandler>
+      <div className="container mx-auto py-8 px-4 flex flex-col items-center min-h-screen relative">
+      
 
       <div className="w-full max-w-md mb-8">
         <div className="bg-white/80 backdrop-blur-sm border border-gray-100 p-6 rounded-xl shadow-lg">
@@ -271,7 +315,7 @@ const BurnBookApp: React.FC = () => {
       <div className="w-full flex flex-col items-center space-y-6">
         <div className="w-full max-w-md">
           <h2 className="text-2xl font-bold mb-4 text-center text-gray-800">Torn out Pages</h2>
-          <div className="max-h-[40vh] overflow-y-auto mb-4 pr-2">
+          <div className="max-h-[40vh] overflow-y-auto mb-4 pr-2 pb-32">
             {sealedIdeas.map((idea) => (
               <IdeaCard key={idea.id} idea={idea} />
             ))}
@@ -279,7 +323,11 @@ const BurnBookApp: React.FC = () => {
         </div>
 
         <div
-          className="w-full max-w-md"
+          id="burn-zone"
+          className={`
+            w-full max-w-md
+            ${isMobile ? 'fixed bottom-0 left-0 right-0 z-50' : ''}
+          `}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -303,6 +351,7 @@ const BurnBookApp: React.FC = () => {
                 ? 'border-red-500 bg-red-50/80'
                 : 'border-red-300 bg-white/40'
             }
+            ${isMobile ? 'rounded-b-none' : ''}
           `}>
             <FlameIcon isHovering={isHoveringBurn} isDropping={isDropping} />
             <p className={`
@@ -312,13 +361,13 @@ const BurnBookApp: React.FC = () => {
               duration-300
               ${isDropping ? 'opacity-0' : 'opacity-100'}
             `}>
-              Drop pages here to burn them forever
+              {isMobile ? 'Drag pages here to burn them' : 'Drop pages here to burn them forever'}
             </p>
           </div>
           <MobileHelper />
         </div>
       </div>
-
+      
       <ToastContainer
         position="bottom-center"
         theme="light"
@@ -329,8 +378,9 @@ const BurnBookApp: React.FC = () => {
         }}
       />
     </div>
+    </TouchHandler>
   );
-};
+}; // Close the BurnBookApp component
 
 const TIMER_DURATION = 30; // 30 seconds
 
