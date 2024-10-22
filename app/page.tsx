@@ -73,8 +73,9 @@ const BurnBookApp: React.FC = () => {
   const [draggedIdea, setDraggedIdea] = useState<Idea | null>(null);
   const [isHoveringBurn, setIsHoveringBurn] = useState<boolean>(false);
   const [isDropping, setIsDropping] = useState(false);
-
-
+  // New state for touch functionality
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [currentTouchedIdea, setCurrentTouchedIdea] = useState<Idea | null>(null);
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (!isSealed) {
@@ -97,20 +98,63 @@ const BurnBookApp: React.FC = () => {
     setSealedIdeas((prevIdeas) => [newIdea, ...prevIdeas]);
     setContent('');
     setIsSealed(false);
-  }, [content]); // Add content as dependency
+  }, [content]);
 
+  // Existing drag handlers
   const handleDragStart = (idea: Idea) => {
     setDraggedIdea(idea);
   };
 
-  // Modify handleDragOver to remove unused 'save' type:
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsHoveringBurn(true);
   };
 
-  // Modify handleDragLeave to remove unused type parameter:
   const handleDragLeave = () => {
+    setIsHoveringBurn(false);
+  };
+
+  // New touch handlers
+  const handleTouchStart = (e: React.TouchEvent, idea: Idea) => {
+    setTouchStartY(e.touches[0].clientY);
+    setCurrentTouchedIdea(idea);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault();
+    if (touchStartY && currentTouchedIdea) {
+      const touchY = e.touches[0].clientY;
+      const deltaY = touchY - touchStartY;
+
+      if (deltaY > 50) {
+        setIsHoveringBurn(true);
+      } else {
+        setIsHoveringBurn(false);
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartY && currentTouchedIdea) {
+      const touchY = e.changedTouches[0].clientY;
+      const deltaY = touchY - touchStartY;
+
+      if (deltaY > 50) {
+        setIsDropping(true);
+        setTimeout(() => {
+          setIsDropping(false);
+          setSealedIdeas((prev) => 
+            prev.filter((idea) => idea.id !== currentTouchedIdea.id)
+          );
+          toast.error("🔥 Page burned forever!", {
+            style: { background: '#ffeded' }
+          });
+        }, 1500);
+      }
+    }
+    
+    setTouchStartY(null);
+    setCurrentTouchedIdea(null);
     setIsHoveringBurn(false);
   };
 
@@ -124,19 +168,37 @@ const BurnBookApp: React.FC = () => {
       toast.error("🔥 Page burned forever!", {
         style: { background: '#ffeded' }
       });
-    }, 1500); // Duration of burn animation
+    }, 1500);
 
     setDraggedIdea(null);
     setIsHoveringBurn(false);
   };
 
+  // Updated IdeaCard component with touch handlers
   const IdeaCard: React.FC<{ idea: Idea }> = ({ idea }) => (
     <div
       draggable
       onDragStart={() => handleDragStart(idea)}
-      className="bg-white/80 backdrop-blur-sm shadow-md rounded-xl p-4 mb-4 cursor-move 
-      hover:shadow-lg transition-all duration-200 border border-gray-100
-      hover:bg-white/90"
+      onTouchStart={(e) => handleTouchStart(e, idea)}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className={`
+        bg-white/80 
+        backdrop-blur-sm 
+        shadow-md 
+        rounded-xl 
+        p-4 
+        mb-4 
+        cursor-move 
+        hover:shadow-lg 
+        transition-all 
+        duration-200 
+        border 
+        border-gray-100
+        hover:bg-white/90
+        touch-manipulation
+        ${currentTouchedIdea?.id === idea.id ? 'scale-105' : ''}
+      `}
     >
       <p className="text-gray-800">{idea.content}</p>
       <p className="text-sm text-gray-500 mt-2">
@@ -145,7 +207,13 @@ const BurnBookApp: React.FC = () => {
     </div>
   );
 
-  // Fix the useEffect dependency:
+  // Mobile helper component
+  const MobileHelper: React.FC = () => (
+    <div className="text-center text-sm text-gray-500 mt-2 md:hidden">
+      Drag pages downward to burn them
+    </div>
+  );
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (timer !== null && timer > 0) {
@@ -158,7 +226,7 @@ const BurnBookApp: React.FC = () => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [timer, handleSeal]); // Added handleSeal to dependencies
+  }, [timer, handleSeal]);
 
   return (
     <div className="container mx-auto py-8 px-4 flex flex-col items-center min-h-screen">
@@ -201,7 +269,6 @@ const BurnBookApp: React.FC = () => {
       </div>
 
       <div className="w-full flex flex-col items-center space-y-6">
-        {/* Torn out Pages Section */}
         <div className="w-full max-w-md">
           <h2 className="text-2xl font-bold mb-4 text-center text-gray-800">Torn out Pages</h2>
           <div className="max-h-[40vh] overflow-y-auto mb-4 pr-2">
@@ -211,7 +278,6 @@ const BurnBookApp: React.FC = () => {
           </div>
         </div>
 
-        {/* Burn Box Section */}
         <div
           className="w-full max-w-md"
           onDragOver={handleDragOver}
@@ -249,6 +315,7 @@ const BurnBookApp: React.FC = () => {
               Drop pages here to burn them forever
             </p>
           </div>
+          <MobileHelper />
         </div>
       </div>
 
