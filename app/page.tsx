@@ -1,7 +1,7 @@
 // app/page.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { format } from 'date-fns';
@@ -70,24 +70,11 @@ const BurnBookApp: React.FC = () => {
   const [isSealed, setIsSealed] = useState<boolean>(false);
   const [timer, setTimer] = useState<number | null>(null);
   const [sealedIdeas, setSealedIdeas] = useState<Idea[]>([]);
-  const [savedIdeas, setSavedIdeas] = useState<Idea[]>([]);
   const [draggedIdea, setDraggedIdea] = useState<Idea | null>(null);
   const [isHoveringBurn, setIsHoveringBurn] = useState<boolean>(false);
   const [isDropping, setIsDropping] = useState(false);
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (timer !== null && timer > 0) {
-      interval = setInterval(() => {
-        setTimer((prevTimer) => (prevTimer !== null ? prevTimer - 1 : null));
-      }, 1000);
-    } else if (timer === 0) {
-      handleSeal();
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [timer]);
+
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (!isSealed) {
@@ -98,7 +85,7 @@ const BurnBookApp: React.FC = () => {
     }
   };
 
-  const handleSeal = () => {
+  const handleSeal = useCallback(() => {
     setIsSealed(true);
     setTimer(null);
     toast.info("Your idea has been sealed!");
@@ -110,42 +97,34 @@ const BurnBookApp: React.FC = () => {
     setSealedIdeas((prevIdeas) => [newIdea, ...prevIdeas]);
     setContent('');
     setIsSealed(false);
-  };
+  }, [content]); // Add content as dependency
 
   const handleDragStart = (idea: Idea) => {
     setDraggedIdea(idea);
   };
 
-  const handleDragOver = (e: React.DragEvent, type: 'burn' | 'save') => {
+  // Modify handleDragOver to remove unused 'save' type:
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (type === 'burn') {
-      setIsHoveringBurn(true);
-    }
+    setIsHoveringBurn(true);
   };
 
-  const handleDragLeave = (type: 'burn' | 'save') => {
-    if (type === 'burn') {
-      setIsHoveringBurn(false);
-    }
+  // Modify handleDragLeave to remove unused type parameter:
+  const handleDragLeave = () => {
+    setIsHoveringBurn(false);
   };
 
-  const handleDrop = (destination: 'burn' | 'save') => {
+  const handleDrop = () => {
     if (!draggedIdea) return;
 
-    if (destination === 'burn') {
-      setIsDropping(true);
-      setTimeout(() => {
-        setIsDropping(false);
-        setSealedIdeas((prev) => prev.filter((idea) => idea.id !== draggedIdea.id));
-        toast.error("🔥 Page burned forever!", {
-          style: { background: '#ffeded' }
-        });
-      }, 1500); // Duration of burn animation
-    } else {
+    setIsDropping(true);
+    setTimeout(() => {
+      setIsDropping(false);
       setSealedIdeas((prev) => prev.filter((idea) => idea.id !== draggedIdea.id));
-      setSavedIdeas((prev) => [draggedIdea, ...prev]);
-      toast.success("Idea saved!");
-    }
+      toast.error("🔥 Page burned forever!", {
+        style: { background: '#ffeded' }
+      });
+    }, 1500); // Duration of burn animation
 
     setDraggedIdea(null);
     setIsHoveringBurn(false);
@@ -165,6 +144,21 @@ const BurnBookApp: React.FC = () => {
       </p>
     </div>
   );
+
+  // Fix the useEffect dependency:
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (timer !== null && timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prevTimer) => (prevTimer !== null ? prevTimer - 1 : null));
+      }, 1000);
+    } else if (timer === 0) {
+      handleSeal();
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [timer, handleSeal]); // Added handleSeal to dependencies
 
   return (
     <div className="container mx-auto py-8 px-4 flex flex-col items-center min-h-screen">
@@ -220,9 +214,9 @@ const BurnBookApp: React.FC = () => {
         {/* Burn Box Section */}
         <div
           className="w-full max-w-md"
-          onDragOver={(e) => handleDragOver(e, 'burn')}
-          onDragLeave={() => handleDragLeave('burn')}
-          onDrop={() => handleDrop('burn')}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
         >
           <div className={`
             h-[25vh] 
